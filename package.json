@@ -1,0 +1,31 @@
+{
+  "name": "torch-takehome",
+  "version": "0.0.1",
+  "description": "A takehome assesmnet for Torch Dental.",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "eslint \"src/**/*.{js} --quiet"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/unfaceit/torch-takehome.git"
+  },
+  "author": "Arthur Ryabtsev",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/unfaceit/torch-takehome/issues"
+  },
+  "homepage": "https://github.com/unfaceit/torch-takehome#readme",
+  "dependencies": {
+    "body-parser": "^1.19.0",
+    "dotenv": "^8.2.0",
+    "express": "^4.17.1"
+  },
+  "devDependencies": {
+    "eslint": "^7.10.0",
+    "eslint-config-prettier": "^6.12.0",
+    "nodemon": "^2.0.4",
+    "prettier": "^2.1.2"
+  }
+}
