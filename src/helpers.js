@@ -13,6 +13,20 @@ function notify(line, delayed) {
   }
 }
 
+// this function helps you parse the API for the line that has delays
+// API itself return delayed name as a line group and only specifies the exact line in a text message
+function identifyLine([lineGroup], [message]) {
+  // SIR is a line of itself
+  if (lineGroup === "SIR") return lineGroup;
+  // create a list of all lines in group
+  const lines = lineGroup.split("");
+  for (let line of lines) {
+    // console.log(line);
+    // check if line is mentioned in delayed message
+    if (message.includes(`[${line}]`)) return line;
+  }
+}
+
 // helper function to get status of all subway lines
 
 function checkStatus() {
@@ -30,15 +44,18 @@ function checkStatus() {
         // extract delayed routes
         const filtered = service.subway[0].line.filter(({ status }) => {
           // console.log(line.name);
-          return status.includes("DELAYS");
+          // return status.includes("DELAYS");
+          // for debugging, sometimes there are no delays
+          // which are lies, it is MTA after all
+          return status.includes("PLANNED WORK");
         });
         console.log("filtered\n");
-        console.log(filtered);
+        // console.log(filtered);
         // return filtered;
         // for each route, check if it is in a cache or not
-        for (let { name } of filtered) {
-          console.log(name);
-          delayedLines[name[0]] ? notify(name[0]) : notify(name[0], "delayed");
+        for (let lineGroup of filtered) {
+          let line = identifyLine(lineGroup.name, lineGroup.text);
+          delayedLines[line] ? notify(line) : notify(line, "delayed");
         }
       });
     })
