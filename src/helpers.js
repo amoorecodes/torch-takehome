@@ -45,8 +45,9 @@ function checkCache(name, [newDate], [newTime]) {
 
 // helper function to get status of all subway lines
 
-function checkStatus() {
-  axios
+async function checkStatus(specificLine) {
+  // make a request to MTA api
+  const delayed = await axios
     .get(
       "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/camsys%2Fsubway-alerts",
       {
@@ -57,21 +58,34 @@ function checkStatus() {
       }
     )
     .then(({ data }) => {
+      // decode GTFS stream
       let feed = feedMessage.decode(data);
+      // get all delayed routes
       const filtered = feed.entity.filter((message) => {
         // if ID has NYCT it is a delay report
         return message.id.includes("NYCT");
       });
-      console.log("filtered", filtered.length);
+
       for (let message of filtered) {
         console.log(
           "checkStatus: ",
           message.alert.informedEntity[0].trip.routeId
         );
       }
-      console.log(filtered[0]);
+
+      // if no line provided, return all delayed lines
+      return specificLine
+        ? filtered.filter((message) =>
+            message.alert.informedEntity[0].trip.routeId.includes(specificLine)
+          )
+        : filtered;
     })
+    // .then((data) => {
+    //   console.log("\nthis is what we get\n", data);
+    // })
     .catch(console.err);
+
+  return delayed;
 
   // the API returns an xml file, parse it to JSON
   //   xml2js.parseString(data, (err, { service }) => {
