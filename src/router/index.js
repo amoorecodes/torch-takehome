@@ -1,61 +1,34 @@
-const axios = require("axios");
 const express = require("express");
-const GTFS = require("gtfs-realtime-bindings");
-const xml2js = require("xml2js");
+
+const { checkStatus, delayedLines } = require("../helpers");
 
 // create router for updates
 const router = express.Router();
-const feedMessage = GTFS.transit_realtime.FeedMessage;
 
-router.get("/", (req, res) => {
-  res.send("Hello world");
+// endpoint for developing, enables requesting delayed statuses
+router.get("/live", async (req, res) => {
+  let delayed = await checkStatus(null, true);
+  res.send(delayed);
 });
 
-router.get("/live", (req, res) => {
-  axios
-    .get(
-      "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-bdfm",
-      {
-        headers: {
-          "x-api-key": process.env.API_KEY,
-          incrementality: "FULL_DATASET",
-        },
-        responseType: "arraybuffer",
-      }
-    )
-    .then(({ data }) => {
-      console.log(typeof data);
-      console.log(data);
-
-      const feed = feedMessage.decode(data);
-      feed.entity.forEach((line) => {
-        // console.log(line);
-        if (line.tripUpdate) console.log(line.tripUpdate);
-      });
-      res.send(feed.entity);
+router.get("/status/:lineName", async (req, res) => {
+  // SINCE WE UPDATE CACHE EVERY SECOND, WE COULD JUST RETRIEVE THE STATUS FROM THERE
+  delayedLines.delayed.has(req.params.lineName)
+    ? res.send(`Line ${req.params.lineName} is currently delayed`)
+    : res.send(`Line ${req.params.lineName} operates as expected.`);
+  /*
+  // IN CASE YOU WOULD WANT TO SEND A REQUEST ON HITTING THE ENDPOINT
+  await checkStatus(req.params.lineName)
+    .then((data) => {
+      data.length
+        ? res.send(`Line ${req.params.lineName} is currently delayed`)
+        : res.send(`Line ${req.params.lineName} operates as expected.`);
     })
+    .catch(console.error);
+    */
 
-    .catch((err) => console.error(err));
-});
-
-router.get("/status", (req, res) => {
-  axios
-    .get("http://web.mta.info/status/serviceStatus.txt", {
-      headers: {
-        "x-api-key": process.env.API_KEY,
-        "Content-Type": "text/plain",
-      },
-    })
-    .then(({ data }) => {
-      xml2js.parseString(data, (err, { service }) => {
-        if (err) console.error(err);
-        const filtered = service.subway[0].line.filter(({ status }) => {
-          return status.includes("DELAYS");
-        });
-        res.send(filtered);
-      });
-    })
-    .catch(console.err);
+  // just in case return 500
+  res.status(500).send("We have encountered an error. Please try again.");
 });
 
 module.exports = router;
