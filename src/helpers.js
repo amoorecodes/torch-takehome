@@ -16,7 +16,7 @@ function notify(line, delayed) {
 function updateCache(cache, newInfo) {
   // check if line is in delayed cache now but not in the API response
   for (let line of cache) {
-    if (!(line in newInfo)) {
+    if (!newInfo.includes(line)) {
       notify(line);
       cache.delete(line);
     }
@@ -24,7 +24,7 @@ function updateCache(cache, newInfo) {
 
   // check if a line delayed for the first time
   for (let line of newInfo) {
-    if (!(line in cache)) {
+    if (!cache.has(line)) {
       cache.add(line);
       notify(line, true);
     }
