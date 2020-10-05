@@ -19,15 +19,18 @@ app.use(urlencoded({ extended: true }));
 app.use(morgan("dev"));
 app.use(router);
 
-console.log("delayed: ", delayedLines);
 // initiate first status check
-checkStatus();
+checkStatus(null, true);
 /* 
   enable continuous status check. 
   API for status updates is not dynamic. Results are updated every minute, 
   therefore interval of ~10 seconds is appropriate, but can be changed to a smaller value
 */
-setInterval(checkStatus, 10000);
+// setInterval(checkStatus, 10000);
+
+// dev
+// setTimeout(() => console.log("delayed: ", delayedLines), 1000);
+// setTimeout(checkStatus, 5000);
 
 // start the server
 app.listen(3000, (err) => {
