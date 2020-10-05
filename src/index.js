@@ -23,10 +23,9 @@ app.use(router);
 checkStatus(null, true);
 /* 
   enable continuous status check. 
-  API for status updates is not dynamic. Results are updated every minute, 
-  therefore interval of ~10 seconds is appropriate, but can be changed to a smaller value
+  Checks every second against the API, notifies if a line became delayed or back to normal service
 */
-// setInterval(checkStatus, 10000);
+setInterval(checkStatus, 10000, null, true);
 
 // dev
 // setTimeout(() => console.log("delayed: ", delayedLines), 1000);

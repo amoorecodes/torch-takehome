@@ -12,30 +12,26 @@ function notify(line, delayed) {
   }
 }
 
-// this function checks the cache to illiminate repetetive messages
-function checkCache(delayed, line) {
-  if (!delayed.has(line)) {
-    notify(line, true);
-  }
-}
-
 // this function updates cache with new lines
 function updateCache(cache, newInfo) {
+  // check if line is in delayed cache now but not in the API response
   for (let line of cache) {
-    console.log("line in cache: ", line);
+    if (!(line in newInfo)) {
+      notify(line);
+      cache.delete(line);
+    }
   }
 
+  // check if a line delayed for the first time
   for (let line of newInfo) {
-    console.log("line in newInfo: ", line);
     if (!(line in cache)) {
       cache.add(line);
-      notify(line);
+      notify(line, true);
     }
   }
 }
 
 // helper function to get status of all subway lines
-
 async function checkStatus(specificLine, linesOnly) {
   // make a request to MTA api
   const delayed = await axios
@@ -63,18 +59,14 @@ async function checkStatus(specificLine, linesOnly) {
         // dev -> planned work
       });
 
-      console.log("before", specificLine, linesOnly);
+      // if requested to only give the line names, strip all extra information
       if (linesOnly) {
-        console.log("during");
-
         let delayedLines = filtered.reduce((prev, curr) => {
           for (let { routeId } of curr.alert.informedEntity) {
-            console.log("entity in helper checkStatus ", routeId);
             if (routeId) prev.push(routeId);
             return prev;
           }
         }, []);
-        console.log("lines only in helper: ", delayedLines);
         return delayedLines;
       }
 
@@ -87,7 +79,7 @@ async function checkStatus(specificLine, linesOnly) {
     })
     .catch(console.err);
 
-  // updateCache(delayed);
+  updateCache(delayedLines.delayed, delayed);
 
   return delayed;
 }
