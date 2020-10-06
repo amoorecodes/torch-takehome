@@ -14,20 +14,62 @@ function notify(line, delayed) {
 
 // this function updates cache with new lines
 function updateCache(cache, newInfo) {
-  // check if line is in delayed cache now but not in the API response
-  for (let line of cache) {
-    if (!newInfo.includes(line)) {
-      notify(line);
-      cache.delete(line);
+  let delayedLines = {};
+  // iterate through all "DELAYED" alerts
+  for (let { alert } of newInfo) {
+    // single alert can affect several lines
+    for (let entity of alert.informedEntity) {
+      let { routeId } = entity;
+      // sometimes subway alerts includes bus lines, if they function as a shuttle
+      // only include the actual subway lines
+      if (cache[routeId]) {
+        // store currently delayed line in an object for later removal
+        delayedLines[routeId] = true;
+
+        if (!cache.delayed.has(routeId)) {
+          // add line to delayed set, add it's delay start and total times
+          cache.delayed.add(routeId);
+          cache[routeId].lastDelayed = alert.activePeriod[0]?.start?.low;
+          updateDelayedTime(routeId, cache, alert.activePeriod);
+          notify(routeId, true);
+        }
+      }
     }
   }
 
-  // check if a line delayed for the first time
-  for (let line of newInfo) {
-    if (!cache.has(line)) {
-      cache.add(line);
-      notify(line, true);
+  // check if line is in delayed cache but not in the API response
+  for (let line of cache.delayed) {
+    if (!Object.keys(delayedLines).includes(line)) {
+      notify(line);
+      // remove from delayed set, update total/current delay times
+      cache.delayed.delete(line);
+      updateDelayedTime(line, cache);
+      cache[line].lastDelayed = false;
     }
+  }
+}
+
+// function to update delayed times in cache
+function updateDelayedTime(line, cache) {
+  let now = Date.now();
+  let { lastDelayed, totalDelayed } = cache[line];
+
+  // if we have some delayed time and it is currently delayed
+  if (totalDelayed && lastDelayed) {
+    totalDelayed = totalDelayed + (now - lastDelayed);
+    // if it is currently delayed for the first time
+  } else if (lastDelayed) {
+    totalDelayed = cache.startTime - lastDelayed;
+  }
+}
+
+// function to calculate uptime
+async function getUptime(line) {
+  try {
+    await updateDelayedTime(line, delayedLines);
+    return 1 - delayedLines[line].totalDelayed / delayedLines.startTime;
+  } catch (err) {
+    console.error("Couldn not get uptime:\n", err);
   }
 }
 
@@ -47,39 +89,28 @@ async function checkStatus(specificLine, linesOnly) {
     .then(({ data }) => {
       // decode GTFS stream
       let feed = feedMessage.decode(data);
-      // return feed;
       // get all delayed routes
       const filtered = feed.entity.filter((message) => {
-        // if ID has NYCT it is a delay report
-        // return message.id.includes("NYCT");
-
         // over the weekend the results have changed and now they have "Delays" under delayed line
-        return message.alert.headerText.translation[0].text === "Delays";
-
-        // dev -> planned work
+        return (
+          // different objects have different structure
+          // one time it broke the app by not having headerText :shrug:
+          message.alert?.headerText?.translation[0]?.text === "Delays"
+        );
       });
 
-      // if requested to only give the line names, strip all extra information
-      if (linesOnly) {
-        let delayedLines = filtered.reduce((prev, curr) => {
-          for (let { routeId } of curr.alert.informedEntity) {
-            if (routeId) prev.push(routeId);
-            return prev;
-          }
-        }, []);
-        return delayedLines;
-      }
-
-      // if no line provided, return all delayed lines
+      // filter delays for specific line, if requested
       return specificLine
-        ? filtered.filter((message) =>
-            message.alert.informedEntity[0].trip.routeId.includes(specificLine)
-          )
+        ? filtered.filter(({ alert }) => {
+            for (let message in alert.informedEntity) {
+              return message.trip.routeId.includes(specificLine);
+            }
+          })
         : filtered;
     })
     .catch(console.err);
 
-  updateCache(delayedLines.delayed, delayed);
+  updateCache(delayedLines, delayed);
 
   return delayed;
 }
@@ -113,12 +144,13 @@ const subwayLines = [
 ];
 const delayedLines = {};
 
+// function to create cache from scratch
 function createLinesCache() {
+  delayedLines["startTime"] = Date.now();
   for (let item of subwayLines) {
     delayedLines[item] = {
-      // alerts: [],
-      delayed: false,
-      activePeriod: false,
+      lastDelayed: false,
+      totalDelayed: 0,
     };
   }
   delayedLines["delayed"] = new Set();
@@ -126,4 +158,4 @@ function createLinesCache() {
 
 createLinesCache();
 
-module.exports = { notify, checkStatus, delayedLines };
+module.exports = { notify, checkStatus, delayedLines, getUptime };
