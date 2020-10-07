@@ -21,7 +21,7 @@ router.get("/live", async (req, res) => {
 router.get("/status/:lineName", async (req, res) => {
   try {
     // SINCE WE UPDATE CACHE EVERY SECOND, WE COULD JUST RETRIEVE THE STATUS FROM THERE
-    delayedLines.delayed.has(req.params.lineName)
+    delayedLines.delayed.has(req.params.lineName.toUpperCase())
       ? res.send(`Line ${req.params.lineName} is currently delayed`)
       : res.send(`Line ${req.params.lineName} operates as expected.`);
     /*
@@ -45,7 +45,8 @@ router.get("/status/:lineName", async (req, res) => {
 
 router.get("/uptime/:lineName", async (req, res) => {
   try {
-    const uptime = await getUptime(req.params.lineName);
+    console.log("sending uptime");
+    const uptime = await getUptime(req.params.lineName.toUpperCase());
     res.send({ uptime });
   } catch (err) {
     req

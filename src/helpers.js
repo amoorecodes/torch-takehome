@@ -12,6 +12,11 @@ function notify(line, delayed) {
   }
 }
 
+// MTA Api is using epoch time
+// function toLocalTime(epoch) {
+//   return epoch.toString() + "000";
+// }
+
 // this function updates cache with new lines
 function updateCache(cache, newInfo) {
   let delayedLines = {};
@@ -29,8 +34,9 @@ function updateCache(cache, newInfo) {
         if (!cache.delayed.has(routeId)) {
           // add line to delayed set, add it's delay start and total times
           cache.delayed.add(routeId);
-          cache[routeId].lastDelayed = alert.activePeriod[0]?.start?.low;
-          updateDelayedTime(routeId, cache, alert.activePeriod);
+          // incoming time format is epoch
+          cache[routeId].lastDelayed = alert.activePeriod[0]?.start?.low * 1000;
+          updateDelayedTime(routeId, cache);
           notify(routeId, true);
         }
       }
@@ -56,10 +62,10 @@ function updateDelayedTime(line, cache) {
 
   // if we have some delayed time and it is currently delayed
   if (totalDelayed && lastDelayed) {
-    totalDelayed = totalDelayed + (now - lastDelayed);
+    cache[line].totalDelayed = totalDelayed + (now - lastDelayed);
     // if it is currently delayed for the first time
   } else if (lastDelayed) {
-    totalDelayed = cache.startTime - lastDelayed;
+    cache[line].totalDelayed = lastDelayed - cache.startTime;
   }
 }
 
@@ -67,7 +73,10 @@ function updateDelayedTime(line, cache) {
 async function getUptime(line) {
   try {
     await updateDelayedTime(line, delayedLines);
-    return 1 - delayedLines[line].totalDelayed / delayedLines.startTime;
+    return (
+      1 -
+      delayedLines[line].totalDelayed / (Date.now() - delayedLines.startTime)
+    );
   } catch (err) {
     console.error("Couldn not get uptime:\n", err);
   }
@@ -75,44 +84,48 @@ async function getUptime(line) {
 
 // helper function to get status of all subway lines
 async function checkStatus(specificLine, linesOnly) {
-  // make a request to MTA api
-  const delayed = await axios
-    .get(
-      "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/camsys%2Fsubway-alerts",
-      {
-        headers: {
-          "x-api-key": process.env.API_KEY,
-        },
-        responseType: "arraybuffer",
-      }
-    )
-    .then(({ data }) => {
-      // decode GTFS stream
-      let feed = feedMessage.decode(data);
-      // get all delayed routes
-      const filtered = feed.entity.filter((message) => {
-        // over the weekend the results have changed and now they have "Delays" under delayed line
-        return (
-          // different objects have different structure
-          // one time it broke the app by not having headerText :shrug:
-          message.alert?.headerText?.translation[0]?.text === "Delays"
-        );
-      });
+  try {
+    // make a request to MTA api
+    const delayed = await axios
+      .get(
+        "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/camsys%2Fsubway-alerts",
+        {
+          headers: {
+            "x-api-key": process.env.API_KEY,
+          },
+          responseType: "arraybuffer",
+        }
+      )
+      .then(({ data }) => {
+        // decode GTFS stream
+        let feed = feedMessage.decode(data);
+        // get all delayed routes
+        const filtered = feed.entity.filter((message) => {
+          // over the weekend the results have changed and now they have "Delays" under delayed line
+          return (
+            // different objects have different structure
+            // one time it broke the app by not having headerText :shrug:
+            message.alert?.headerText?.translation[0]?.text === "Delays"
+          );
+        });
 
-      // filter delays for specific line, if requested
-      return specificLine
-        ? filtered.filter(({ alert }) => {
-            for (let message in alert.informedEntity) {
-              return message.trip.routeId.includes(specificLine);
-            }
-          })
-        : filtered;
-    })
-    .catch(console.err);
+        // filter delays for specific line, if requested
+        return specificLine
+          ? filtered.filter(({ alert }) => {
+              for (let message in alert.informedEntity) {
+                return message.trip.routeId.includes(specificLine);
+              }
+            })
+          : filtered;
+      })
+      .catch(console.err);
 
-  updateCache(delayedLines, delayed);
+    updateCache(delayedLines, delayed);
 
-  return delayed;
+    return delayed;
+  } catch (err) {
+    console.error(err);
+  }
 }
 
 // cache object with delayed lines
