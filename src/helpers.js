@@ -12,11 +12,6 @@ function notify(line, delayed) {
   }
 }
 
-// MTA Api is using epoch time
-// function toLocalTime(epoch) {
-//   return epoch.toString() + "000";
-// }
-
 // this function updates cache with new lines
 function updateCache(cache, newInfo) {
   let delayedLines = {};
@@ -36,7 +31,6 @@ function updateCache(cache, newInfo) {
           cache.delayed.add(routeId);
           // incoming time format is epoch
           cache[routeId].lastDelayed = alert.activePeriod[0]?.start?.low * 1000;
-          updateDelayedTime(routeId, cache);
           notify(routeId, true);
         }
       }
@@ -62,21 +56,23 @@ function updateDelayedTime(line, cache) {
 
   // if we have some delayed time and it is currently delayed
   if (totalDelayed && lastDelayed) {
-    cache[line].totalDelayed = totalDelayed + (now - lastDelayed);
+    cache[line].totalDelayed += +Math.abs(now - lastDelayed);
     // if it is currently delayed for the first time
   } else if (lastDelayed) {
-    cache[line].totalDelayed = lastDelayed - cache.startTime;
+    cache[line].totalDelayed = Math.abs(lastDelayed - cache.startTime);
   }
 }
 
 // function to calculate uptime
 async function getUptime(line) {
   try {
-    await updateDelayedTime(line, delayedLines);
-    return (
-      1 -
-      delayedLines[line].totalDelayed / (Date.now() - delayedLines.startTime)
-    );
+    let now = Date.now();
+    let totalTimeUp = now - delayedLines.startTime;
+    let totalDelayed = 0;
+    delayedLines[line].lastDelayed
+      ? (totalDelayed += Math.abs(now - delayedLines[line].lastDelayed))
+      : delayedLines[line].totalDelayed;
+    return 1 - totalDelayed / totalTimeUp;
   } catch (err) {
     console.error("Couldn not get uptime:\n", err);
   }

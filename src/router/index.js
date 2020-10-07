@@ -1,21 +1,20 @@
 const express = require("express");
-
 const { checkStatus, delayedLines, getUptime } = require("../helpers");
 
 // create router for updates
 const router = express.Router();
 
 // endpoint for developing, enables requesting delayed statuses
-router.get("/live", async (req, res) => {
-  try {
-    let delayed = await checkStatus();
-    res.send(delayed);
-  } catch (err) {
-    res
-      .status(500)
-      .send("We have encountered an error while requesting delay information");
-  }
-});
+// router.get("/live", async (req, res) => {
+//   try {
+//     let delayed = await checkStatus();
+//     res.send(delayed);
+//   } catch (err) {
+//     res
+//       .status(500)
+//       .send("We have encountered an error while requesting delay information");
+//   }
+// });
 
 // route to check if a line is delayed or not
 router.get("/status/:lineName", async (req, res) => {
@@ -45,7 +44,6 @@ router.get("/status/:lineName", async (req, res) => {
 
 router.get("/uptime/:lineName", async (req, res) => {
   try {
-    console.log("sending uptime");
     const uptime = await getUptime(req.params.lineName.toUpperCase());
     res.send({ uptime });
   } catch (err) {
